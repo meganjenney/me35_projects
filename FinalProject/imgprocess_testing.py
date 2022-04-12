@@ -1,6 +1,6 @@
 #!usr/bin/env python3
 ### Created by Megan Jenney
-### Last Edited 25 March 2022
+### Last Edited 12 April 2022
 ### 
 ### Intro to Robotics and Mechanics
 ### Tufts University Spring 2022
@@ -12,10 +12,15 @@
 ###     processing team. Focus on translation from binary contour
 ###     image to coordinates, which will be sent to the frosting
 ###     mechanism team.
+### Each coordinate is equivalent to a square of 0.05in x 0.05in.
+### Coordinates are sent as a list in gcode (x,y,e) format.
+#####################################################################
 
 import numpy as np
 import cv2 as cv
+import airtable
 
+# function definitions
 def rowsToAdd(pix_col, pix_row):
     in_pix_ratio = pix_col / 13
     corr_rows = in_pix_ratio * 9
@@ -64,34 +69,69 @@ def addCols(add_left, add_rgt, img):
     
     return np.concatenate((lft, img, rgt), axis=1)
 
+def changeImgRatio(rows, cols, img):
+    pan_ratio = 6 / 7.5
+    img_ratio = rows / cols
 
-img = cv.imread("trees_allcontours.jpeg", cv.IMREAD_REDUCED_GRAYSCALE_2)
-
-thresh, bin_img = cv.threshold(img, 136, 255, cv.THRESH_BINARY)
-
-print(np.shape(bin_img))
-
-rows = np.shape(bin_img)[0]
-cols = np.shape(bin_img)[1]
-
-pan_ratio = 9/13
-img_ratio = rows / cols
-
-print(pan_ratio)
-print(img_ratio)
-
-if img_ratio < pan_ratio:
-    print("add rows")
-    add_top, add_btm = rowsToAdd(cols, rows)
-    new_img = addRows(add_top, add_btm, bin_img)
+    if img_ratio < pan_ratio:
+        add_top, add_btm = rowsToAdd(cols, rows)
+        return addRows(add_top, add_btm, img)
         
-elif img_ratio > pan_ratio:
-    print("add columns")
-    add_lft, add_rgt = colsToAdd(rows, cols)
-    new_img = addCols(add_lft, add_rgt, bin_img)
-else:
-    print("dont add")
-    new_img = bin_img
+    elif img_ratio > pan_ratio:
+        add_lft, add_rgt = colsToAdd(rows, cols)
+        return addCols(add_lft, add_rgt, bin_img)
+    else:
+        return img
 
+def changeImgScale(coord_size, img):
+    dims = (int(7.5 / coord_size), int(6 / coord_size))
+    float_img = img.astype('float32')
+    return cv.resize(float_img, dims, interpolation=cv.INTER_AREA)
 
-cv.imwrite("modified_image.jpeg", new_img)
+def resizeImg(rows, cols, coord_size, img):
+    ratio_img = changeImgRatio(rows, cols, img)
+    return changeImgScale(coord_size, ratio_img)
+
+def coordList(coord_size, img):
+    coords = []
+    for x in range(int(6 * coord_size)):
+        for y in range(int(7.5 * coord_size)):
+            e = final_img[x,y]
+            if e == 0.0:
+                coords.append((x,y,0))
+            else:
+                coords.append((x,y,1))
+    return coords
+
+def sendToAPI(coords):
+    base_key = 'appuhn9X6CJyPGaho'
+    table_name = 'control'
+    api_key = 'keylvkrPfqTyKrObK'
+    at = airtable.Airtable(base_key, table_name, api_key)
+    
+    record = at.match("Name", "coordinates")
+    fields = {'Status': True}#, 'Attachment': coords}
+    at.update(record["id"], fields)
+    print('sent coords to api')
+    
+
+# import image
+img = cv.imread("trees_allcontours.jpeg", cv.IMREAD_GRAYSCALE)
+
+thresh, binary_img = cv.threshold(img, 136, 255, cv.THRESH_BINARY)
+
+rows = np.shape(binary_img)[0]
+cols = np.shape(binary_img)[1]
+coord_size = 0.05
+scaled_img = resizeImg(rows, cols, coord_size, binary_img)
+
+# export image to new file
+cv.imwrite("scaled_image.jpeg", scaled_img)
+
+# get list of coordinates
+coords = coordList(coord_size, scaled_img)
+#print(coords)
+a = np.asarray(coords)
+np.savetxt("coords.csv", a, delimiter=',')
+# export coordinates
+#sendToAPI(coords)
