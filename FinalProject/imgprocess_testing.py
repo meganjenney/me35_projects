@@ -96,11 +96,13 @@ def coordList(coord_size, img):
     coords = []
     for x in range(int(6 * coord_size)):
         for y in range(int(7.5 * coord_size)):
-            e = final_img[x,y]
+            e = img[x,y]
+            print(e)
+            print(type(e))
             if e == 0.0:
-                coords.append((x,y,0))
+                coords = coords.append([x,y,0])
             else:
-                coords.append((x,y,1))
+                coords = coords.append([x,y,1])
     return coords
 
 def sendToAPI(coords):
@@ -124,14 +126,27 @@ rows = np.shape(binary_img)[0]
 cols = np.shape(binary_img)[1]
 coord_size = 0.05
 scaled_img = resizeImg(rows, cols, coord_size, binary_img)
-
+print(np.shape(scaled_img))
 # export image to new file
 cv.imwrite("scaled_image.jpeg", scaled_img)
 
 # get list of coordinates
-coords = coordList(coord_size, scaled_img)
-#print(coords)
+#coords = coordList(coord_size, scaled_img)
+coords = []
+for x in range(int(6 / coord_size)):
+    for y in range(int(7.5 / coord_size)):
+        if x==0:
+            if y==0:
+                print(type(x))
+        e = scaled_img[x,y]
+        if e == 0.0:
+            coords.append([x,y,0])
+        else:
+            coords.append([x,y,1])
+
+print(coords)
 a = np.asarray(coords)
+print('a:', a)
 np.savetxt("coords.csv", a, delimiter=',')
 # export coordinates
 #sendToAPI(coords)
