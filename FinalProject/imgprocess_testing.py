@@ -19,6 +19,8 @@
 import numpy as np
 import cv2 as cv
 import airtable
+import pandas as pd
+from matplotlib import pyplot
 
 # function definitions
 def rowsToAdd(pix_col, pix_row):
@@ -94,15 +96,13 @@ def resizeImg(rows, cols, coord_size, img):
 
 def coordList(coord_size, img):
     coords = []
-    for x in range(int(6 * coord_size)):
-        for y in range(int(7.5 * coord_size)):
+    for x in range(int(6 / coord_size)):
+        for y in range(int(7.5 / coord_size)):
             e = img[x,y]
-            print(e)
-            print(type(e))
             if e == 0.0:
-                coords = coords.append([x,y,0])
+                coords.append([x,y,0])
             else:
-                coords = coords.append([x,y,1])
+                coords.append([x,y,1])
     return coords
 
 def sendToAPI(coords):
@@ -122,31 +122,29 @@ img = cv.imread("trees_allcontours.jpeg", cv.IMREAD_GRAYSCALE)
 
 thresh, binary_img = cv.threshold(img, 136, 255, cv.THRESH_BINARY)
 
+
 rows = np.shape(binary_img)[0]
 cols = np.shape(binary_img)[1]
 coord_size = 0.05
-scaled_img = resizeImg(rows, cols, coord_size, binary_img)
-print(np.shape(scaled_img))
+resized_img = changeImgRatio(rows,cols,binary_img).astype('uint8')
+#scaled_img = resizeImg(rows, cols, coord_size, binary_img).astype('uint8')
+#print(np.shape(resized_img))
 # export image to new file
-cv.imwrite("scaled_image.jpeg", scaled_img)
+cv.imwrite("resized_image.jpeg", resized_img)
+#print(cv.imread('scaled_image.jpeg', cv.IMREAD_GRAYSCALE).dtype)
 
-# get list of coordinates
-#coords = coordList(coord_size, scaled_img)
-coords = []
-for x in range(int(6 / coord_size)):
-    for y in range(int(7.5 / coord_size)):
-        if x==0:
-            if y==0:
-                print(type(x))
-        e = scaled_img[x,y]
-        if e == 0.0:
-            coords.append([x,y,0])
-        else:
-            coords.append([x,y,1])
 
-print(coords)
-a = np.asarray(coords)
-print('a:', a)
-np.savetxt("coords.csv", a, delimiter=',')
+contours = cv.findContours(resized_img, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+line_coords = []
+for line in contours[0]:
+    for wrapped_point in line:
+        line_coords.append(wrapped_point[0])
+
+#pyplot.figure()
+#pyplot.scatter(line_coords[:][0], line_coords[:][1])
+#pyplot.show()
+array_coords = np.asarray(line_coords)
+np.savetxt("coordinates.csv", array_coords, delimiter=',')
+#np.savetxt("coords.csv", a, delimiter=',')
 # export coordinates
 #sendToAPI(coords)
